@@ -19,6 +19,8 @@ use tower::Service;
 use super::request::{Request, RequestBuilder};
 use super::response::Response;
 use super::wait;
+#[cfg(unix)]
+use crate::connect::uds::UnixSocketProvider;
 use crate::connect::sealed::{Conn, Unnameable};
 use crate::connect::BoxedConnectorService;
 use crate::dns::Resolve;
@@ -78,6 +80,8 @@ pub struct Client {
 pub struct ClientBuilder {
     inner: async_impl::ClientBuilder,
     timeout: Timeout,
+    #[cfg(unix)]
+    unix_socket: Option<Arc<std::path::Path>>,
 }
 
 impl Default for ClientBuilder {
@@ -94,6 +98,8 @@ impl ClientBuilder {
         ClientBuilder {
             inner: async_impl::ClientBuilder::new(),
             timeout: Timeout::default(),
+            #[cfg(unix)]
+            unix_socket: None,
         }
     }
 }
@@ -1014,6 +1020,12 @@ impl ClientBuilder {
         self.inner = func(self.inner);
         self
     }
+
+    #[cfg(unix)]
+    pub fn unix_socket(mut self, path: impl UnixSocketProvider) -> ClientBuilder {
+        self.unix_socket = Some(path.reqwest_uds_path(crate::connect::uds::Internal).into());
+        self
+    }
 }
 
 impl From<async_impl::ClientBuilder> for ClientBuilder {
@@ -1021,6 +1033,8 @@ impl From<async_impl::ClientBuilder> for ClientBuilder {
         Self {
             inner: builder,
             timeout: Timeout::default(),
+            #[cfg(unix)]
+            unix_socket: None,
         }
     }
 }
